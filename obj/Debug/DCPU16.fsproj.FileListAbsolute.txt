@@ -1,8 +1,0 @@
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\bin\Debug\DCPU16.exe.config
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\bin\Debug\DCPU16.XML
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\bin\Debug\DCPU16.exe
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\bin\Debug\DCPU16.pdb
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\bin\Debug\FSharp.Core.dll
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\bin\Debug\FSharp.Core.xml
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\obj\Debug\DCPU16.exe
-c:\users\jkarn\documents\visual studio 2015\Projects\DCPU16\DCPU16\obj\Debug\DCPU16.pdb
