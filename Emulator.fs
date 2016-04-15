@@ -14,7 +14,7 @@ module CPU =
              * 11 -> IA 
       Ram.[1] -> actual ram 
     *)
-    let mutable Ram: uint16 array array = [| Array.zeroCreate 13 ; Array.zeroCreate 0x10000 |]
+    let mutable Ram: uint16 array array = [| Array.zeroCreate 13 ; Array.zeroCreate 0x10000 ; Array.zeroCreate 0x100 |]
     let mutable indices = 0, 0
 
     let inline shr x by: Word = x >>> int by
@@ -38,15 +38,14 @@ module CPU =
     let inline setEX (value: Word)      = setregl VALUE.EX value 
 
     let dump () =
-        printfn "PC:%x SP:%x IA:%x EX:%x" (regl VALUE.PC) (regl VALUE.SP) (regl VALUE.IA) (regl VALUE.EX) 
-        printfn "A:%x B:%x C:%x X:%x Y:%x Z:%x I:%x J:%x" (reg 0us) (reg 1us) (reg 2us) (reg 3us) (reg 4us) (reg 5us) (reg 6us) (reg 7us)
+        printfn "\n\n___________________________________\nPC: %04x SP: %04x IA: %04x EX: %04x|" (regl VALUE.PC) (regl VALUE.SP) (regl VALUE.IA) (regl VALUE.EX) 
+        printfn "___________________________________|\nA : %04x B : %04x C : %04x         |\n___________________________________|\nX : %04x Y : %04x Z : %04x         |\n___________________________________|\nI : %04x J : %04x                  |\n___________________________________|"
+                    (reg 0us) (reg 1us) (reg 2us) (reg 3us) (reg 4us) (reg 5us) (reg 6us) (reg 7us)
 
 
     (* returns a, b, and o, respectively *)
     let isolate (word: Word) =
-        let (a,b,o) = (word >>> int 10) &&& 0x3fus, (word >>> int 5) &&& 0x1fus, word &&& 0x1fus
-        printfn "a: %d b: %d o: %d" a b o
-        a,b,o
+        (word >>> int 10) &&& 0x3fus, (word >>> int 5) &&& 0x1fus, word &&& 0x1fus
 
     let create (w: Word*Word*Word) =
         let (a,b,o) = w
@@ -59,12 +58,12 @@ module CPU =
                     "ADX";"SBX";"";"";"STI";"STD" |]
 
     let printIns (a: Word) (b: Word) (o: Word) =
-        printfn "%s: %d , %d" insArr.[int o] b a  
+        () //printfn "%s: %d , %d" insArr.[int o] b a  
                   
     let inline stack () = Ram.[1].[int VALUE.SP]
 
     (* Loads a program into memory *)
-    let loadProgram (prog: Word array) = 
+    let loadProgram (prog: Word list) = 
         for i in 0 .. prog.Length - 1 do
             Array.set Ram.[1] i prog.[i]
         ()
@@ -93,31 +92,33 @@ module CPU =
         incPC ()
         r  
 
+    (* Decode an argument on the right side of an instruction *)
     let getA (a: Word) = 
         match int a with
-        | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7             ->  reg <| a
-        | 8 | 9 | 0xA | 0xB | 0xC | 0xD | 0xE | 0xF ->  a - 8us |> reg |> mem
-        | v when v <= 0x17  ->  let r = mem (reg (a - 16us) + mem (regl VALUE.PC))
+        | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7             ->  reg <| a                    (* registers A,B,C,X,Y,Z,I,J in order*)
+        | 8 | 9 | 0xA | 0xB | 0xC | 0xD | 0xE | 0xF ->  a - 8us |> reg |> mem       (* memory the address A,B,C,X,Y,Z,I,J in order*)
+        | v when v <= 0x17  ->  let r = mem (reg (a - 16us) + mem (regl VALUE.PC))  (* memory at the address PC + [register] *)
                                 incPC ()
                                 r
-        | 0x18 ->   let r = stack ()
+        | 0x18 ->   let r = stack ()                                                (* the value on top of the stack and decreases stack pointer, POP *)
                     getSP () + 1us |> setSP
                     r
-        | 0x19 ->   stack ()
+        | 0x19 ->   stack ()                                                        (* PEEK, gets value on top of stack *)
         | 0x1A ->   let r = getSP () + mem (getPC ()) |> mem
                     getPC () + 1us |> setPC
                     r
-        | 0x1B ->   getSP ()
-        | 0x1C ->   getPC ()
-        | 0x1D ->   regl (VALUE.EX)         
-        | 0x1E ->   let r = getPC () |> mem |> mem
+        | 0x1B ->   getSP ()                                                        (* stack pointer, SP *)
+        | 0x1C ->   getPC ()                                                        (* program counter, PC *)
+        | 0x1D ->   regl (VALUE.EX)                                                 (* extra register, EX *)
+        | 0x1E ->   let r = getPC () |> mem |> mem                                  (* memory with the next word as the memory address *)
                     incPC()
                     r
-        | 0x1f ->   let r = getPC () |> mem
+        | 0x1f ->   let r = getPC () |> mem                                         (* the next word *)
                     incPC()
                     r
-        | _    ->   a - 0x21us
+        | _    ->   a - 0x21us                                                      (* Literal value *)
 
+    (* The same as the last function except every instruction sets something called indices, which are indexes on the 2d memory array that contain the proper operands *)
     let getB (b: Word) =
         let v = int b
         match v with
@@ -126,8 +127,7 @@ module CPU =
         | 8 | 9 | 0xA | 0xB | 0xC | 0xD | 0xE | 0xF ->  let r = v - 8 |> Word |> reg 
                                                         indices <- 1, int r
                                                         mem r
-        | v when v <= 0x17     ->   printfn "good"
-                                    let r = reg (Word (v - 16)) + mem (regl VALUE.PC)
+        | v when v <= 0x17     ->   let r = reg (Word (v - 16)) + mem (regl VALUE.PC)
                                     indices <- 1, int r
                                     incPC ()
                                     mem r
@@ -154,7 +154,7 @@ module CPU =
                     indices <- 1, int r
                     incPC()
                     mem r
-        | _    ->   indices <- 0, 12    // result is put in the temp value, since the result of this instruction doesnt matter
+        | _    ->   indices <- 0, 12
                     b - 0x21us
     (*
      * Run an instruction
@@ -169,11 +169,27 @@ module CPU =
         let sa = asSigned a
 
         match bo with
-            |   0x00us ->   match nextIns () with
+            |   0x00us ->   match bb with
+                            (* JSR *)
                             | 0x01us    ->  setSP (getSP () - 1us)
                                             Ram.[1].[int <| getSP ()] <- getPC () + 1us
                                             setPC a
-                            | _         -> () (* Unsupported *)
+                            (* INT *)
+                            | 0x08us    -> () (* Unsupported *)
+                            (* IAG *)
+                            | 0x09us    -> ()
+                            (* IAS *)
+                            | 0x0Aus    -> ()
+                            (* RFI *)
+                            | 0x0Bus    -> ()
+                            (* IAQ *)
+                            | 0x0Cus    -> ()
+                            (* HWN *)
+                            | 0x10us    -> ()
+                            (* HWQ *)
+                            | 0x11us    -> ()
+                            (* HWI *)
+                            | 0x12us    -> ()
             (* SET *)
             |   0x01us ->   b.[ind] <- a
             (* ADD *)
@@ -184,24 +200,25 @@ module CPU =
                             subUnderflow bv a |> setEX
             (* MUL *)
             |   0x04us ->   b.[ind] <- bv * a
-                            (16 |> shr (a * bv) |> band 0xffffus) |> setEX
+                            (16 |> shr b.[ind] |> band 0xffffus) |> setEX
             (* MLI *)
             |   0x05us ->   b.[ind] <- asUnsigned <| sa * sb
-                            asUnsigned <| (sa * sb) >>> 16 |> setEX
+                            (sa * sb) >>> 16 |> asUnsigned |> band 0xffffus |> setEX
             (* DIV *)
             |   0x06us ->   let _b, _EX = 
                                 match a with
                                 | 0us   -> 0us, 0us
                                 | _     -> bv / a , ((bv <<< 16) / a) &&& 0xffffus
                             b.[ind] <- _b
-                            setEX _EX
+                            uint16 ((int b.[ind]) * 0x10000) &&& 0xffffus |> setEX
             (* DVI *)
             |   0x07us ->   let _b, _EX = 
                                 match a with
                                 | 0us   -> 0us, 0us
                                 | _     -> asUnsigned <| (sb / sa) , ((bv <<< 16) / a) &&& 0xffffus
                             b.[ind] <- _b
-                            setEX _EX
+                            asUnsigned (int16 ((int (asSigned b.[ind])) * 0x10000)) &&& 0xffffus |> setEX
+
             (* MOD *)
             |   0x08us ->   let n =
                                 match a with
@@ -209,8 +226,7 @@ module CPU =
                                 | _     -> bv % a
                             b.[ind] <- n
             (* MDI *)
-            |   0x09us ->   printfn "%d" (sa)
-                            let n =
+            |   0x09us ->   let n =
                                 match a with
                                 | 0us   -> 0us
                                 | _     -> asUnsigned <| sb % sa
@@ -223,23 +239,13 @@ module CPU =
             |   0x0Cus ->   b.[ind] <- xor bv a
             (* SHR *)
             |   0x0Dus ->   b.[ind] <- shr bv a
-                            a 
-                            |> int 
-                            |> ashr bv <<< 16 
-                            |> band 0xffffus 
-                            |> setEX // (shr ((b.contents <<< 16), a)) &&& 0xffffus
+                            (shr (shl bv 16) a) &&& 0xffffus |> setEX // (shr ((b.contents <<< 16), a)) &&& 0xffffus
             (* aSR *)
             |   0x0Eus ->   b.[ind] <- ashr bv a
-                            a
-                            |> shr bv <<< 16
-                            |> band 0xffffus
-                            |> setEX
+                            (shr (shl bv 16) a) &&& 0xffffus |> setEX
             (* SHL *)
             |   0x0Fus ->   b.[ind] <- shl bv a
-                            16 
-                            |> ashr <| shl bv a
-                            |> band 0xffffus
-                            |> setEX
+                            (shl (shr bv a) 16us) &&& 0xffffus |> setEX
             (* IFb *)
             |   0x10us ->   match band bv a with
                             | 0us -> ()
