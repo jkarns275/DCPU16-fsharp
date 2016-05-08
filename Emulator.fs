@@ -1,5 +1,7 @@
 ﻿namespace DCPU16
 
+
+(* JUST *)
 module CPU =
     type Word = uint16
     let inline Word x = (uint16) x
@@ -78,6 +80,7 @@ module CPU =
         match sum with
         | sum when sum < 0  -> 0xffffus
         | _                 -> 0us
+
 
     let asSigned (x: Word) =
         let (sign, value) = int16 (x >>> 15),  int16 (x &&& 0x7fffus)
