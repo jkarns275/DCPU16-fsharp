@@ -79,10 +79,10 @@ module CPU =
         | sum when sum < 0  -> 0xffffus
         | _                 -> 0us
 
+    (* JUST *)
     let asSigned (x: Word) =
         let (sign, value) = int16 (x >>> 15),  int16 (x &&& 0x7fffus)
         int16 (value ||| (sign <<< 15))
-
     let asUnsigned (x: int16): Word =
         let (sign, value) = uint16 (x >>> 15),  uint16 (x &&& 0x7fffs)
         uint16 (value ||| (sign <<< 15))
